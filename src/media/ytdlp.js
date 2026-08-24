@@ -2,6 +2,41 @@
 const { spawn } = require('child_process');
 const { YTDLP_BIN } = require('../core/config');
 
+// ---------------------------------------------------------------
+// Caché en memoria de URLs de audio directas.
+// El paso más caro es la extracción de yt-dlp (carga de la página de
+// YouTube + red). Reutilizar la URL si la misma canción vuelve a sonar
+// en la sesión elimina ese coste casi por completo.
+// Las URLs de YouTube (googlevideo.com) suelen ser válidas ~6h ligadas a
+// la IP de quien las pidió; usamos un TTL conservador de 45 min.
+// ---------------------------------------------------------------
+const DIRECT_URL_CACHE_TTL_MS = 45 * 60 * 1000; // 45 minutos
+const directUrlCache = new Map(); // url -> { directUrl, ts }
+
+function getCachedDirectUrl(url) {
+  const entry = directUrlCache.get(url);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > DIRECT_URL_CACHE_TTL_MS) {
+    directUrlCache.delete(url);
+    return null;
+  }
+  return entry.directUrl;
+}
+
+function setCachedDirectUrl(url, direct) {
+  if (!url || !direct) return;
+  directUrlCache.set(url, { directUrl: direct, ts: Date.now() });
+  // Evita que el mapa crezca sin límite con canciones distintas de la sesión.
+  if (directUrlCache.size > 500) {
+    const oldest = directUrlCache.keys().next().value;
+    if (oldest) directUrlCache.delete(oldest);
+  }
+}
+
+function clearCachedDirectUrl(url) {
+  directUrlCache.delete(url);
+}
+
 /**
  * Run yt-dlp to extract a streamable audio URL for the given URL/query.
  * Returns the direct audio URL, or null if it failed.
@@ -54,25 +89,35 @@ function ytDlpJson(args) {
 
 /** Normaliza la info cruda de yt-dlp a un objeto de pista (track). */
 function normalizeTrack(info, url) {
-  return {
+  const track = {
     title: info.title || info.fulltitle || url,
     url,
     thumbnail: info.thumbnail || info.thumbnails?.[0]?.url || null,
     channel: info.channel || info.uploader || info.artist || null,
     durationSeconds: info.duration ?? null,
   };
+  // Cuando pedimos `-f bestaudio -J`, `info.url` ya es la URL de audio directa
+  // (googlevideo.com o un manifiesto HLS). Guardarla aquí evita una 2ª llamada
+  // a yt-dlp en playNext -> arranca la canción en la mitad de tiempo.
+  const direct = info.url;
+  if (direct) {
+    track.directUrl = direct;
+    setCachedDirectUrl(url, direct);
+  }
+  return track;
 }
 
 /** Get resolved track info (title + playable URL) for any target. */
 async function resolveTrack(query) {
   const isURL = /^https?:\/\//i.test(query);
   if (isURL) {
-    const info = await ytDlpJson(['-J', '--no-playlist', '--no-warnings', query]);
+    // Una sola ejecución: metadatos + URL de audio directa (bestaudio).
+    const info = await ytDlpJson(['-f', 'bestaudio', '-J', '--no-playlist', '--no-warnings', query]);
     return normalizeTrack(info, query);
   }
   // treat as search
-  const searchResult = await ytDlpJson(['-J', '--no-playlist', '--no-warnings', `ytsearch1:${query.replace(/"/g, '')}`]);
-  // Para busquedas, yt-dlp devuelve un objeto "playlist" cuyo nivel superior
+  const searchResult = await ytDlpJson(['-f', 'bestaudio', '-J', '--no-playlist', '--no-warnings', `ytsearch1:${query.replace(/"/g, '')}`]);
+  // Para buscar, yt-dlp devuelve un objeto "playlist" cuyo nivel superior
   // solo repite la query (id/title/webpage_url = "ytsearch1:...") en lugar
   // del video real, que esta en entries[0].
   const info = (searchResult.entries && searchResult.entries[0]) || searchResult;
@@ -143,4 +188,13 @@ async function getRelatedEntries(url) {
   }
 }
 
-module.exports = { getDirectAudioUrl, ytDlpJson, resolveTrack, getPlaylistEntries, getRelatedEntries };
+module.exports = {
+  getDirectAudioUrl,
+  ytDlpJson,
+  resolveTrack,
+  getPlaylistEntries,
+  getRelatedEntries,
+  getCachedDirectUrl,
+  setCachedDirectUrl,
+  clearCachedDirectUrl,
+};

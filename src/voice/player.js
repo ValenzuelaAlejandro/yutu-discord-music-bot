@@ -8,7 +8,13 @@ const {
   entersState,
   VoiceConnectionStatus,
 } = require('@discordjs/voice');
-const { getDirectAudioUrl, getRelatedEntries } = require('../media/ytdlp');
+const {
+  getDirectAudioUrl,
+  getRelatedEntries,
+  getCachedDirectUrl,
+  setCachedDirectUrl,
+  clearCachedDirectUrl,
+} = require('../media/ytdlp');
 const { createFfmpegStream } = require('../media/ffmpeg');
 const { trackEmbed } = require('../discord/embeds');
 
@@ -21,6 +27,11 @@ const queueMap = new Map();
 // - AUTOPLAY_RECENT_CAP: tamaño del historial para no repetir pistas en la sesión.
 const AUTOPLAY_TOPSIZE = 10;
 const AUTOPLAY_RECENT_CAP = 30;
+
+// Cuántas pistas de la cola pre-resolvemos en segundo plano (URL directa)
+// mientras suena la actual, para que el salto entre canciones sea casi
+// instantáneo (evita el silencio de esperar una extracción de yt-dlp).
+const PRELOAD_AHEAD = 3;
 
 // Manejador de "now playing": se inyecta desde index.js (setClient) para poder
 // enviar mensajes al canal de texto donde se usaron los comandos.
@@ -53,6 +64,7 @@ function ensureQueue(guildId) {
       autoplayEnabled: false,
       recentlyPlayed: [],
       refilling: false,
+      preloading: false, // guard simple: no lanzar 2 pre-cargas a la vez
     });
     // Attach once
     player.on('stateChange', (oldState, newState) => {
@@ -127,7 +139,7 @@ async function playNext(guildId, retry = 0, announce = true) {
   }
   console.log(`[PlayNext:${guildId}] Now playing: ${track.title} (${track.url}) -- remaining: ${q.queue.length}${retry > 0 ? ` (retry ${retry})` : ''}`);
   try {
-    const direct = await getDirectAudioUrl(track.url);
+    const direct = await resolveTrackDirectUrl(track);
     if (!direct) {
       throw new Error('No se pudo obtener stream para ' + track.url);
     }
@@ -138,6 +150,9 @@ async function playNext(guildId, retry = 0, announce = true) {
     if (q.connection) q.connection.subscribe(q.player);
     console.log(`[PlayNext:${guildId}] resource playing`);
     if (announce) announceNowPlaying(guildId, track);
+    // Pre-carga en segundo plano: resuelve la URL de la(s) siguiente(s) pista(s)
+    // mientras suena esta, para que al terminar no haya espera (sin silencio).
+    scheduleQueuePreload(guildId);
     // Pre-carga en segundo plano: mantiene la cola llena del mismo estilo para
     // que al terminar esta canción la siguiente ya esté lista (sin silencio).
     scheduleAutoplayRefill(guildId);
@@ -145,6 +160,9 @@ async function playNext(guildId, retry = 0, announce = true) {
     console.error('[PlayNext] Error reproduciendo pista:', err);
     // No quemar la cola por un fallo temporal (p.ej. YouTube dejó de responder):
     // reintentamos la misma pista unas veces antes de pasar a la siguiente.
+    // Invalidamos la URL en caché para que el reintento use una extracción nueva.
+    if (track.directUrl) track.directUrl = null;
+    clearCachedDirectUrl(track.url);
     if (retry < 2) {
       if (q.ffmpegProcess && !q.ffmpegProcess.killed) {
         q.ffmpegProcess.kill('SIGKILL');
@@ -157,9 +175,66 @@ async function playNext(guildId, retry = 0, announce = true) {
   }
 }
 
+/**
+ * Resuelve la URL de audio directa de una pista, reutilizando caché / directUrl
+ * cuando existen y evitando lanzar yt-dlp dos veces a la vez para la misma pista
+ * (single-flight a través de track.directUrlPromise). Devuelve la URL o null.
+ */
+function resolveTrackDirectUrl(track) {
+  const cached = getCachedDirectUrl(track.url) || track.directUrl;
+  if (cached) return Promise.resolve(cached);
+  if (track.directUrlPromise) return track.directUrlPromise;
+  track.directUrlPromise = getDirectAudioUrl(track.url)
+    .then((direct) => {
+      if (direct) {
+        track.directUrl = direct;
+        setCachedDirectUrl(track.url, direct);
+      }
+      return direct;
+    })
+    .finally(() => {
+      track.directUrlPromise = null;
+    });
+  return track.directUrlPromise;
+}
+
+/**
+ * Pre-resuelve en segundo plano (sin bloquear la reproducción) la URL de audio
+ * de las próximas PRELOAD_AHEAD pistas de la cola. Así, cuando una canción
+ * termina o se salta, la siguiente ya tiene su URL y solo falta spawnear ffmpeg
+ * (~200ms) en lugar de esperar una extracción completa de yt-dlp.
+ */
+async function preloadQueuedTracks(guildId) {
+  const q = ensureQueue(guildId);
+  if (q.preloading) return;
+  q.preloading = true;
+  try {
+    const toResolve = q.queue.slice(0, PRELOAD_AHEAD);
+    // Lanzamos todos en paralelo (no esperar uno tras otro) para minimizar el tiempo.
+    await Promise.all(
+      toResolve.map(async (track) => {
+        const url = await resolveTrackDirectUrl(track);
+        if (!url) console.warn(`[Preload:${guildId}] No se pudo pre-cargar "${track.title}"`);
+      })
+    );
+  } catch (err) {
+    console.warn(`[Preload:${guildId}] Fallo en la pre-carga en segundo plano:`, err?.message || err);
+  } finally {
+    q.preloading = false;
+  }
+}
+
+/** Lanza la pre-carga en segundo plano sin bloquear el hilo de reproducción. */
+function scheduleQueuePreload(guildId) {
+  setImmediate(() => preloadQueuedTracks(guildId));
+}
+
 function addToQueue(guildId, track) {
   const q = ensureQueue(guildId);
   q.queue.push(track);
+  // Si ya hay música sonando, pre-resolvemos la URL de lo recién encolado en
+  // segundo plano para que cuando llegue su turno arranque al instante.
+  if (q.playing) scheduleQueuePreload(guildId);
 }
 
 /** Guarda el canal de texto donde se controlan los comandos para anunciar "now playing". */
@@ -337,4 +412,6 @@ module.exports = {
   resetAutoplaySession,
   setAutoplayEnabled,
   getAutoplayState,
+  scheduleQueuePreload,
+  preloadQueuedTracks,
 };
