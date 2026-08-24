@@ -9,6 +9,9 @@ const ffmpegPath = require('ffmpeg-static');
 function createFfmpegStream(directUrl) {
   const ff = spawn(ffmpegPath, [
     '-re',
+    '-reconnect', '1',
+    '-reconnect_streamed', '1',
+    '-reconnect_delay_max', '10',
     '-i', directUrl,
     '-analyzeduration', '0',
     '-loglevel', '0',

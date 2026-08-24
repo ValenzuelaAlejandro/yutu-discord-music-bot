@@ -16,7 +16,14 @@ const queueMap = new Map();
 
 function ensureQueue(guildId) {
   if (!queueMap.has(guildId)) {
-    const player = createAudioPlayer();
+    // maxMissedFrames alto: el valor por defecto es 5 (~100-200ms), lo que hace que
+    // cualquier micro-corte en el stream (latencia de red, picos del servidor, backpressure
+    // del pipe de ffmpeg/opus) detenga la pista y el handler de Idle avance la cola.
+    // Con 300 ciclos (aprox. 6 segundos de tolerancia) un parpadeo breve ya no corta la canción.
+    // Cuando la pista termina de verdad, la transición a Idle se da igual por `readable === false`.
+    const player = createAudioPlayer({
+      maxMissedFrames: 300,
+    });
     queueMap.set(guildId, {
       voiceChannel: null,
       connection: null,
@@ -73,16 +80,17 @@ async function joinChannelAndPrepare(member) {
   return q;
 }
 
-async function playNext(guildId) {
+async function playNext(guildId, retry = 0) {
   const q = ensureQueue(guildId);
-  const track = q.queue.shift();
+  // En reintentos reutilizamos la misma pista (ya la sacamos de la cola); si no hay reintento, avanzamos.
+  const track = retry === 0 ? q.queue.shift() : q.lastTrack;
   if (!track) {
     q.playing = false;
     return;
   }
   q.playing = true;
   q.lastTrack = track;
-  console.log(`[PlayNext:${guildId}] Now playing: ${track.title} (${track.url}) -- remaining: ${q.queue.length}`);
+  console.log(`[PlayNext:${guildId}] Now playing: ${track.title} (${track.url}) -- remaining: ${q.queue.length}${retry > 0 ? ` (retry ${retry})` : ''}`);
   try {
     const direct = await getDirectAudioUrl(track.url);
     if (!direct) {
@@ -96,7 +104,17 @@ async function playNext(guildId) {
     console.log(`[PlayNext:${guildId}] resource playing`);
   } catch (err) {
     console.error('[PlayNext] Error reproduciendo pista:', err);
-    playNext(guildId);
+    // No quemar la cola por un fallo temporal (p.ej. YouTube dejó de responder):
+    // reintentamos la misma pista unas veces antes de pasar a la siguiente.
+    if (retry < 2) {
+      if (q.ffmpegProcess && !q.ffmpegProcess.killed) {
+        q.ffmpegProcess.kill('SIGKILL');
+        q.ffmpegProcess = null;
+      }
+      setTimeout(() => playNext(guildId, retry + 1), 3000);
+    } else {
+      playNext(guildId);
+    }
   }
 }
 
