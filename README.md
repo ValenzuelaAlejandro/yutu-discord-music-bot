@@ -30,6 +30,7 @@ Comandos slash (todos responden con embeds, sin emojis):
 - `/pause`: pausa la reproducción.
 - `/resume`: reanuda la reproducción.
 - `/queue`: muestra la cola con la foto de la pista actual.
+- `/nowplaying`: muestra la pista que suena ahora con su miniatura y estado (sonando / pausada / cargando / detenida).
 - `/autoplay`: activa/desactiva el autoplay "radio similar". En cuanto se activa (o al empezar a sonar una canción), el bot **pre-carga en segundo plano** una cola de ~10 pistas del mismo estilo musical (usando el radio/mix de YouTube de la canción que suena), así al terminar una canción la siguiente ya está lista y no hay silencio. El estado se guarda solo mientras el bot permanece en el canal de voz; si el bot sale del VC, el autoplay se apaga solo.
 
 Estructura del proyecto:
@@ -43,6 +44,7 @@ src/
     pause.js         # /pause
     resume.js        # /resume
     queue.js         # /queue (embed con la foto de la pista actual)
+    nowplaying.js    # /nowplaying (pista actual + estado)
     autoplay.js      # /autoplay (activa/desactiva la radio del mismo estilo)
   core/              # Infraestructura y configuración de la app
     config.js        # Configuración y constantes (token, rutas de binarios)

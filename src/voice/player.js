@@ -200,6 +200,12 @@ function getQueueState(guildId) {
   return { current: q.lastTrack, queue: q.queue };
 }
 
+/** Estado de la pista actual para el comando /nowplaying: pista + estado del player. */
+function getNowPlaying(guildId) {
+  const q = ensureQueue(guildId);
+  return { track: q.lastTrack, status: q.player.state.status };
+}
+
 /**
  * Autoplay "radio similar". Se invoca cuando la cola queda vacía y el player
  * pasa a Idle. Busca pistas del mismo estilo musical (radio/mix de YouTube)
@@ -326,6 +332,7 @@ module.exports = {
   pause,
   resume,
   getQueueState,
+  getNowPlaying,
   triggerAutoplay,
   resetAutoplaySession,
   setAutoplayEnabled,

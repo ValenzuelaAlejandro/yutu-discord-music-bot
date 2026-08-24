@@ -78,6 +78,38 @@ function queueEmbed(state) {
   return embed;
 }
 
+/**
+ * Embed para /nowplaying: muestra la pista actual con su miniatura y estado
+ * (sonando / pausada / cargando / detenida) según el status del AudioPlayer.
+ */
+function nowPlayingEmbed(state) {
+  const track = state.track;
+  const status = state.status;
+  let title = 'Reproduciendo ahora';
+  let color = COLORS.success;
+  if (status === 'paused' || status === 'autopaused') {
+    title = 'Pausada';
+    color = COLORS.warning;
+  } else if (status === 'buffering') {
+    title = 'Cargando...';
+    color = COLORS.warning;
+  } else if (status === 'idle') {
+    title = 'Detenida';
+    color = COLORS.warning;
+  }
+  const embed = new EmbedBuilder()
+    .setColor(color)
+    .setTitle(title)
+    .setDescription(`**[${track.title}](${track.url})**`)
+    .addFields(
+      { name: 'Canal', value: track.channel || 'Desconocido', inline: true },
+      { name: 'Duración', value: formatDuration(track.durationSeconds), inline: true },
+      { name: 'Solicitada por', value: track.requester || '—', inline: true },
+    );
+  if (track.thumbnail) embed.setThumbnail(track.thumbnail);
+  return embed;
+}
+
 /** Embed de estado simple (skip / pause / resume). */
 function statusEmbed(title, description, colorKey = 'success') {
   if (!COLORS[colorKey]) colorKey = 'success';
@@ -108,6 +140,7 @@ module.exports = {
   trackEmbed,
   playlistEmbed,
   queueEmbed,
+  nowPlayingEmbed,
   statusEmbed,
   warningEmbed,
   errorEmbed,

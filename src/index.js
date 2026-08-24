@@ -9,6 +9,7 @@ const { handlePause } = require('./commands/pause');
 const { handleResume } = require('./commands/resume');
 const { handleQueue } = require('./commands/queue');
 const { handleAutoplay } = require('./commands/autoplay');
+const { handleNowPlaying } = require('./commands/nowplaying');
 const { setClient } = require('./voice/player');
 
 // Prevent a second instance from stealing interactions (Unknown interaction 10062).
@@ -29,6 +30,7 @@ const COMMAND_DEFINITIONS = [
   new SlashCommandBuilder().setName('resume').setDescription('Reanuda la reproducción').toJSON(),
   new SlashCommandBuilder().setName('queue').setDescription('Muestra la cola').toJSON(),
   new SlashCommandBuilder().setName('autoplay').setDescription('Activa/desactiva el autoplay (radio del mismo estilo)').toJSON(),
+  new SlashCommandBuilder().setName('nowplaying').setDescription('Muestra la pista que suena ahora y su estado').toJSON(),
 ];
 
 client.once('clientReady', async () => {
@@ -71,6 +73,9 @@ client.on('interactionCreate', async (interaction) => {
         break;
       case 'autoplay':
         handleAutoplay(interaction);
+        break;
+      case 'nowplaying':
+        handleNowPlaying(interaction);
         break;
     }
   } catch (err) {
