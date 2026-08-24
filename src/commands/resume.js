@@ -1,7 +1,7 @@
 // /resume command: resumes the current track.
-const { resume } = require('../audio');
-const { safeReply } = require('../reply');
-const { statusEmbed } = require('../embeds');
+const { resume } = require('../voice/player');
+const { safeReply } = require('../discord/reply');
+const { statusEmbed } = require('../discord/embeds');
 
 function handleResume(interaction) {
   resume(interaction.guildId);

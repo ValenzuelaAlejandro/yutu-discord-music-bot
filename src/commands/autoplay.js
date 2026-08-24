@@ -1,8 +1,8 @@
 // /autoplay command: toggles the "radio similar" autoplay for the current VC session.
 // El estado solo se conserva mientras el bot permanece en el canal de voz.
-const { getAutoplayState, setAutoplayEnabled } = require('../audio');
-const { safeReply } = require('../reply');
-const { statusEmbed } = require('../embeds');
+const { getAutoplayState, setAutoplayEnabled } = require('../voice/player');
+const { safeReply } = require('../discord/reply');
+const { statusEmbed } = require('../discord/embeds');
 
 function handleAutoplay(interaction) {
   const enabled = setAutoplayEnabled(interaction.guildId, !getAutoplayState(interaction.guildId));

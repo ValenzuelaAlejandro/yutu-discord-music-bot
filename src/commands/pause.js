@@ -1,7 +1,7 @@
 // /pause command: pauses the current track.
-const { pause } = require('../audio');
-const { safeReply } = require('../reply');
-const { statusEmbed } = require('../embeds');
+const { pause } = require('../voice/player');
+const { safeReply } = require('../discord/reply');
+const { statusEmbed } = require('../discord/embeds');
 
 function handlePause(interaction) {
   pause(interaction.guildId);

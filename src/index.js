@@ -1,7 +1,7 @@
 // Entry point: creates the client, registers slash commands and routes interactions.
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
-const { TOKEN, CLIENT_ID, GUILD_ID } = require('./config');
-const { acquireSingleInstanceLock } = require('./lock');
+const { TOKEN, CLIENT_ID, GUILD_ID } = require('./core/config');
+const { acquireSingleInstanceLock } = require('./core/lock');
 
 const { handlePlay } = require('./commands/play');
 const { handleSkip } = require('./commands/skip');
@@ -9,7 +9,7 @@ const { handlePause } = require('./commands/pause');
 const { handleResume } = require('./commands/resume');
 const { handleQueue } = require('./commands/queue');
 const { handleAutoplay } = require('./commands/autoplay');
-const { setClient } = require('./audio');
+const { setClient } = require('./voice/player');
 
 // Prevent a second instance from stealing interactions (Unknown interaction 10062).
 acquireSingleInstanceLock();

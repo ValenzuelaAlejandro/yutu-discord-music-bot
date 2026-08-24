@@ -8,9 +8,9 @@ const {
   entersState,
   VoiceConnectionStatus,
 } = require('@discordjs/voice');
-const { getDirectAudioUrl, getRelatedEntries } = require('./ytdlp');
-const { createFfmpegStream } = require('./ffmpeg');
-const { trackEmbed } = require('./embeds');
+const { getDirectAudioUrl, getRelatedEntries } = require('../media/ytdlp');
+const { createFfmpegStream } = require('../media/ffmpeg');
+const { trackEmbed } = require('../discord/embeds');
 
 // guildId -> { voiceChannel, connection, player, queue: [], playing, lastTrack, ffmpegProcess }
 const queueMap = new Map();

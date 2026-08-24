@@ -1,7 +1,7 @@
 // /queue command: shows the current queue with the current track's thumbnail.
-const { getQueueState } = require('../audio');
-const { safeReply } = require('../reply');
-const { queueEmbed } = require('../embeds');
+const { getQueueState } = require('../voice/player');
+const { safeReply } = require('../discord/reply');
+const { queueEmbed } = require('../discord/embeds');
 
 function handleQueue(interaction) {
   const state = getQueueState(interaction.guildId);

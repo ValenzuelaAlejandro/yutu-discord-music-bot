@@ -1,6 +1,6 @@
 // Helpers for interacting with the bundled yt-dlp binary.
 const { spawn } = require('child_process');
-const { YTDLP_BIN } = require('./config');
+const { YTDLP_BIN } = require('../core/config');
 
 /**
  * Run yt-dlp to extract a streamable audio URL for the given URL/query.

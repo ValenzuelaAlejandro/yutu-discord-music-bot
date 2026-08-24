@@ -36,21 +36,25 @@ Estructura del proyecto:
 
 ```
 src/
-  index.js           # Entry point: cliente, registro de comandos y routing de interacciones
-  config.js          # Configuración y constantes (token, rutas de binarios)
-  lock.js            # Bloqueo de instancia única (evita interacciones duplicadas / 10062)
-  reply.js           # Helpers de respuesta segura ante DiscordAPIError
-  embeds.js          # Constructores de embeds reutilizables (miniatura del video, cola, etc.)
-  ytdlp.js           # Helpers para yt-dlp (URL directa, JSON, resolver pistas, playlists)
-  ffmpeg.js          # Helper para transcode de audio con ffmpeg-static
-  audio.js           # Subsistema de audio (cola, reproductor, conexión de voz)
-  commands/          # Cada comando slash en su propio archivo
+  index.js           # Punto de entrada: cliente, registro de comandos y routing de interacciones
+  commands/          # Un archivo por comando slash
     play.js          # /play (embed con miniatura)
     skip.js          # /skip
     pause.js         # /pause
     resume.js        # /resume
     queue.js         # /queue (embed con la foto de la pista actual)
     autoplay.js      # /autoplay (activa/desactiva la radio del mismo estilo)
+  core/              # Infraestructura y configuración de la app
+    config.js        # Configuración y constantes (token, rutas de binarios)
+    lock.js          # Bloqueo de instancia única (evita interacciones duplicadas / 10062)
+  discord/           # Capa de presentación de Discord
+    reply.js         # Helpers de respuesta segura ante DiscordAPIError
+    embeds.js        # Constructores de embeds reutilizables (miniatura, cola, avisos, etc.)
+  media/             # Extracción y procesamiento multimedia
+    ytdlp.js         # Helpers para yt-dlp (URL directa, JSON, resolver pistas, playlists)
+    ffmpeg.js        # Helper para transcode de audio con ffmpeg-static
+  voice/             # Motor de reproducción de audio
+    player.js        # Reproductor (cola, conexión de voz, autoplay "radio similar")
 ```
 
 Notas:

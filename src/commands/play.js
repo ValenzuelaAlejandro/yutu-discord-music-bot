@@ -1,8 +1,8 @@
 // /play command: joins the voice channel, resolves the track(s) and starts playback.
-const { joinChannelAndPrepare, playNext, addToQueue, setAnnounceChannel } = require('../audio');
-const { resolveTrack, getPlaylistEntries } = require('../ytdlp');
-const { safeEditReply } = require('../reply');
-const { trackEmbed, playlistEmbed, warningEmbed, errorEmbed } = require('../embeds');
+const { joinChannelAndPrepare, playNext, addToQueue, setAnnounceChannel } = require('../voice/player');
+const { resolveTrack, getPlaylistEntries } = require('../media/ytdlp');
+const { safeEditReply } = require('../discord/reply');
+const { trackEmbed, playlistEmbed, warningEmbed, errorEmbed } = require('../discord/embeds');
 
 async function handlePlay(interaction, query) {
   console.log(`[Command:${interaction.guildId}] /play by ${interaction.user.tag}: ${query}`);

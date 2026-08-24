@@ -1,7 +1,7 @@
 // /skip command: stops the current track (queue advances automatically).
-const { skip } = require('../audio');
-const { safeReply } = require('../reply');
-const { statusEmbed } = require('../embeds');
+const { skip } = require('../voice/player');
+const { safeReply } = require('../discord/reply');
+const { statusEmbed } = require('../discord/embeds');
 
 function handleSkip(interaction) {
   skip(interaction.guildId);
