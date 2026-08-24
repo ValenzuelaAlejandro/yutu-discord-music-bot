@@ -115,4 +115,32 @@ async function getPlaylistEntries(playlistUrl) {
   });
 }
 
-module.exports = { getDirectAudioUrl, ytDlpJson, resolveTrack, getPlaylistEntries };
+/** Extrae el ID de video de una URL de YouTube, o null si no se puede. */
+function getYouTubeVideoId(url) {
+  try {
+    return new URL(url).searchParams.get('v') || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Obtiene pistas relacionadas del mismo estilo musical usando el "radio/mix"
+ * autogenerado de YouTube (list=RD<id>), el mismo mecanismo que usa YouTube
+ * para su reproducción automática: canciones del mismo género/artista.
+ * Devuelve un array de tracks con el mismo formato que getPlaylistEntries,
+ * o [] si no se pudo obtener.
+ */
+async function getRelatedEntries(url) {
+  const id = getYouTubeVideoId(url);
+  if (!id) return [];
+  const radioUrl = `https://www.youtube.com/watch?v=${id}&list=RD${id}`;
+  try {
+    return await getPlaylistEntries(radioUrl);
+  } catch (err) {
+    console.warn('[yt-dlp] no se pudo obtener el radio/mix (autoplay):', err?.message || err);
+    return [];
+  }
+}
+
+module.exports = { getDirectAudioUrl, ytDlpJson, resolveTrack, getPlaylistEntries, getRelatedEntries };
