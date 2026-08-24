@@ -8,11 +8,14 @@ const { handleSkip } = require('./commands/skip');
 const { handlePause } = require('./commands/pause');
 const { handleResume } = require('./commands/resume');
 const { handleQueue } = require('./commands/queue');
+const { setClient } = require('./audio');
 
 // Prevent a second instance from stealing interactions (Unknown interaction 10062).
 acquireSingleInstanceLock();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
+// Inyecta el cliente en el subsistema de audio para enviar el embed "now playing".
+setClient(client);
 
 const COMMAND_DEFINITIONS = [
   new SlashCommandBuilder()

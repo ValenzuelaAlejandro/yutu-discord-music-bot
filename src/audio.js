@@ -10,9 +10,17 @@ const {
 } = require('@discordjs/voice');
 const { getDirectAudioUrl } = require('./ytdlp');
 const { createFfmpegStream } = require('./ffmpeg');
+const { trackEmbed } = require('./embeds');
 
 // guildId -> { voiceChannel, connection, player, queue: [], playing, lastTrack, ffmpegProcess }
 const queueMap = new Map();
+
+// Manejador de "now playing": se inyecta desde index.js (setClient) para poder
+// enviar mensajes al canal de texto donde se usaron los comandos.
+let client = null;
+function setClient(c) {
+  client = c;
+}
 
 function ensureQueue(guildId) {
   if (!queueMap.has(guildId)) {
@@ -31,6 +39,7 @@ function ensureQueue(guildId) {
       queue: [],
       playing: false,
       lastTrack: null,
+      textChannel: null,
       ffmpegProcess: null,
     });
     // Attach once
@@ -80,7 +89,7 @@ async function joinChannelAndPrepare(member) {
   return q;
 }
 
-async function playNext(guildId, retry = 0) {
+async function playNext(guildId, retry = 0, announce = true) {
   const q = ensureQueue(guildId);
   // En reintentos reutilizamos la misma pista (ya la sacamos de la cola); si no hay reintento, avanzamos.
   const track = retry === 0 ? q.queue.shift() : q.lastTrack;
@@ -102,6 +111,7 @@ async function playNext(guildId, retry = 0) {
     q.player.play(resource);
     if (q.connection) q.connection.subscribe(q.player);
     console.log(`[PlayNext:${guildId}] resource playing`);
+    if (announce) announceNowPlaying(guildId, track);
   } catch (err) {
     console.error('[PlayNext] Error reproduciendo pista:', err);
     // No quemar la cola por un fallo temporal (p.ej. YouTube dejó de responder):
@@ -121,6 +131,21 @@ async function playNext(guildId, retry = 0) {
 function addToQueue(guildId, track) {
   const q = ensureQueue(guildId);
   q.queue.push(track);
+}
+
+/** Guarda el canal de texto donde se controlan los comandos para anunciar "now playing". */
+function setAnnounceChannel(guildId, channel) {
+  ensureQueue(guildId).textChannel = channel;
+}
+
+/** Envía el embed "Reproduciendo ahora" al canal de texto del guild cuando arranca una pista. */
+function announceNowPlaying(guildId, track) {
+  const q = queueMap.get(guildId);
+  if (!q || !q.textChannel || !client) return;
+  const embed = trackEmbed({ track, user: track?.requester, mode: 'now' });
+  q.textChannel.send({ embeds: [embed] }).catch((err) => {
+    console.warn(`[PlayNext:${guildId}] no se pudo enviar el now playing:`, err?.message || err);
+  });
 }
 
 function skip(guildId) {
@@ -148,9 +173,11 @@ function getQueueState(guildId) {
 
 module.exports = {
   ensureQueue,
+  setClient,
   joinChannelAndPrepare,
   playNext,
   addToQueue,
+  setAnnounceChannel,
   skip,
   pause,
   resume,

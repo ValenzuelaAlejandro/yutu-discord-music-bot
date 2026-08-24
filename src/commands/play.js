@@ -1,5 +1,5 @@
 // /play command: joins the voice channel, resolves the track(s) and starts playback.
-const { joinChannelAndPrepare, playNext, addToQueue } = require('../audio');
+const { joinChannelAndPrepare, playNext, addToQueue, setAnnounceChannel } = require('../audio');
 const { resolveTrack, getPlaylistEntries } = require('../ytdlp');
 const { safeEditReply } = require('../reply');
 const { trackEmbed, playlistEmbed, warningEmbed, errorEmbed } = require('../embeds');
@@ -20,6 +20,7 @@ async function handlePlay(interaction, query) {
 
   const guildId = interaction.guildId;
   const q = await joinChannelAndPrepare(member);
+  setAnnounceChannel(guildId, interaction.channel);
 
   try {
     // Playlist?
@@ -27,11 +28,12 @@ async function handlePlay(interaction, query) {
       console.log(`[Playlist:${guildId}] fetching playlist entries`);
       const entries = await getPlaylistEntries(query);
       entries.forEach((en) => {
+        en.requester = interaction.user.tag;
         addToQueue(guildId, en);
         console.log(`[Playlist:${guildId}] enqueued ${en.title}`);
       });
       const wasNotPlaying = !q.playing;
-      if (wasNotPlaying) playNext(guildId);
+      if (wasNotPlaying) playNext(guildId, 0, false);
       return safeEditReply(interaction, {
         embeds: [playlistEmbed({ entries, count: entries.length, user: interaction.user.tag })],
       });
@@ -39,10 +41,11 @@ async function handlePlay(interaction, query) {
 
     // Single track (URL or search)
     const track = await resolveTrack(query);
+    track.requester = interaction.user.tag;
     addToQueue(guildId, track);
     console.log(`[Queue:${guildId}] size after add: ${q.queue.length}`);
     const isNowPlaying = !q.playing;
-    if (isNowPlaying) playNext(guildId);
+    if (isNowPlaying) playNext(guildId, 0, false);
     return safeEditReply(interaction, {
       embeds: [trackEmbed({ track, user: interaction.user.tag, mode: isNowPlaying ? 'now' : 'queued' })],
     });
