@@ -45,6 +45,32 @@ YTDLP_COOKIES_CONTENT=# Netscape HTTP Cookie File\nyoutube.com... etc
 `cookies.txt` contiene credenciales sensibles y está excluido de git
 (`.gitignore`). Las cookies caducan; re-expórtalas periódicamente.
 
+### Bloqueo "Sign in to confirm you're not a bot" (IP de datacenter)
+
+Si el bot funciona localmente pero en el hosting falla con ese error aun con
+cookies, la IP del datacenter está bloqueada por YouTube y yt-dlp necesita un
+"player client" alternativo. El bot ya reintenta automáticamente con varios
+clientes al detectar el bloqueo, pero puedes diagnosticar exactamente cuál
+funciona desde la consola del hosting:
+
+```bash
+npm run yt-test
+```
+
+Según el resultado, fija el cliente que pase como variable de entorno:
+
+```
+YTDLP_PLAYER_CLIENT=web_safari
+```
+
+Opciones adicionales via `.env` / variables del panel:
+
+- `YTDLP_PLAYER_CLIENT=<cliente>` — fuerza un player client (p.ej. `web_safari`,
+  `tv`, `android_vr`, `web_embedded`, `mweb`).
+- `YTDLP_PROXY=http://user:pass@host:port` — enruta yt-dlp por un proxy
+  (http/https/socks5). Un proxy residencial suele resolver el bloqueo.
+- `YTDLP_COOKIES`, `YTDLP_COOKIES_CONTENT` — ver sección de cookies.
+
 3. Ejecuta el bot:
 
 ```bash

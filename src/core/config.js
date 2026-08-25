@@ -43,6 +43,29 @@ if (!TOKEN) {
   process.exit(1);
 }
 
-console.log(`[cookies] archivo: ${COOKIES_FILE} (${COOKIES_AVAILABLE ? 'disponible' : 'NO disponible — YouTube puede bloquear la extracción'})`);
+// Detalle útil para diagnosticar el bloqueo "not a bot" desde el arranque.
+let cookieDetail = '';
+if (COOKIES_AVAILABLE) {
+  try {
+    const raw = fs.readFileSync(COOKIES_FILE, 'utf8');
+    const cookieLines = raw.split(/\r?\n/).filter((l) => {
+      const t = l.trim();
+      return t && !t.startsWith('#') && !t.startsWith('\ufeff#');
+    });
+    const names = cookieLines.map((l) => l.split('\t')[5] || '');
+    const hasAuth = names.includes('__Secure-3PSID') || names.includes('SID');
+    cookieDetail = ` (${raw.length} bytes, ${cookieLines.length} cookies, cuenta autenticada: ${hasAuth ? 'sí' : 'NO'})`;
+  } catch { /* si no se puede leer, no importa */ }
+}
+
+console.log(
+  `[cookies] archivo: ${COOKIES_FILE} (${COOKIES_AVAILABLE ? 'disponible' : 'NO disponible — YouTube puede bloquear la extracción'}${cookieDetail})`
+);
+if (process.env.YTDLP_PLAYER_CLIENT) {
+  console.log(`[cookies] YTDLP_PLAYER_CLIENT=${process.env.YTDLP_PLAYER_CLIENT}`);
+}
+if (process.env.YTDLP_PROXY) {
+  console.log('[cookies] usando proxy (YTDLP_PROXY)');
+}
 
 module.exports = { TOKEN, CLIENT_ID, GUILD_ID, YTDLP_BIN, COOKIES_FILE, COOKIES_AVAILABLE };

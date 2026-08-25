@@ -4,7 +4,8 @@
   "description": "Bot de música para Discord usando discord.js, ytdl-core y yt-dlp",
   "main": "src/index.js",
   "scripts": {
-    "start": "node ./src/index.js"
+    "start": "node ./src/index.js",
+    "yt-test": "node scripts/yt-test.js"
   },
   "allowScripts": {
     "ffmpeg-static": true,
