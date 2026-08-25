@@ -1,6 +1,14 @@
 // Helpers for interacting with the bundled yt-dlp binary.
 const { spawn } = require('child_process');
-const { YTDLP_BIN } = require('../core/config');
+const { YTDLP_BIN, COOKIES_FILE, COOKIES_AVAILABLE } = require('../core/config');
+
+// Inyecta --cookies cuando hay un archivo de cookies disponible (evita el
+// bloqueo de YouTube "Sign in to confirm you're not a bot"). Si no existe,
+// deja los args tal cual (funcionaba igual que antes).
+function withCookies(baseArgs) {
+  if (!COOKIES_AVAILABLE) return baseArgs;
+  return [...baseArgs, '--cookies', COOKIES_FILE];
+}
 
 // ---------------------------------------------------------------
 // Caché en memoria de URLs de audio directas.
@@ -44,7 +52,7 @@ function clearCachedDirectUrl(url) {
 function getDirectAudioUrl(target) {
   return new Promise((resolve) => {
     const isSearch = !/^https?:\/\//i.test(target);
-    const args = ['-f', 'bestaudio', '--no-playlist', '-g', '--no-warnings'];
+    const args = withCookies(['-f', 'bestaudio', '--no-playlist', '-g', '--no-warnings']);
     const argTarget = isSearch ? `ytsearch1:${target}` : target;
     args.push(argTarget);
     console.log(`[yt-dlp] direct URL for: ${argTarget} ${isSearch ? '(search)' : ''}`);
@@ -68,7 +76,7 @@ function getDirectAudioUrl(target) {
 /** Run yt-dlp with `--dump-single-json` and parse the JSON output. */
 function ytDlpJson(args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(YTDLP_BIN, args);
+    const child = spawn(YTDLP_BIN, withCookies(args));
     let out = '';
     let errOut = '';
     child.stdout.on('data', (d) => { out += d.toString(); });
@@ -129,7 +137,7 @@ async function resolveTrack(query) {
 
 /** Fetch playlist entries (title + url) for a playlist URL/query. */
 async function getPlaylistEntries(playlistUrl) {
-  const child = spawn(YTDLP_BIN, ['-j', '--flat-playlist', '--no-warnings', playlistUrl]);
+  const child = spawn(YTDLP_BIN, withCookies(['-j', '--flat-playlist', '--no-warnings', playlistUrl]));
   let out = '';
   let errOut = '';
   child.stdout.on('data', (d) => { out += d.toString(); });

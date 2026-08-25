@@ -16,7 +16,23 @@ npm install
 DISCORD_TOKEN=tu_token
 CLIENT_ID=tu_client_id
 GUILD_ID=tu_guild_id   # opcional, útil para registros en guild específico
+YTDLP_COOKIES=ruta/a/cookies.txt   # opcional, ver nota de cookies abajo
 ```
+
+### Cookies de YouTube
+
+YouTube con frecuencia bloquea la extracción sin autenticación con
+"Sign in to confirm you're not a bot". Si `/play` falla con ese error, exporta
+tus cookies de YouTube en formato Netscape y deja el archivo en la raíz del
+proyecto como `cookies.txt` (o apúntalo con `YTDLP_COOKIES` en `.env`):
+
+```bash
+yt-dlp --cookies-from-browser chrome --cookies cookies.txt
+```
+
+El bot detecta el archivo automáticamente y añade `--cookies cookies.txt` a
+todas las llamadas de yt-dlp. `cookies.txt` contiene credenciales sensibles y
+está excluido de git (`.gitignore`).
 
 3. Ejecuta el bot:
 
