@@ -31,8 +31,19 @@ yt-dlp --cookies-from-browser chrome --cookies cookies.txt
 ```
 
 El bot detecta el archivo automáticamente y añade `--cookies cookies.txt` a
-todas las llamadas de yt-dlp. `cookies.txt` contiene credenciales sensibles y
-está excluido de git (`.gitignore`).
+todas las llamadas de yt-dlp. Al arrancar imprime el estado:
+`[cookies] archivo: /ruta/cookies.txt (disponible)`.
+
+**En un hosting (Pterodactyl u otro) sin gestor de archivos:** puedes pasar el
+contenido del archivo por la variable de entorno `YTDLP_COOKIES_CONTENT`
+(cada salto de línea como `\n`) y el bot lo escribe en disco al arrancar:
+
+```
+YTDLP_COOKIES_CONTENT=# Netscape HTTP Cookie File\nyoutube.com... etc
+```
+
+`cookies.txt` contiene credenciales sensibles y está excluido de git
+(`.gitignore`). Las cookies caducan; re-expórtalas periódicamente.
 
 3. Ejecuta el bot:
 

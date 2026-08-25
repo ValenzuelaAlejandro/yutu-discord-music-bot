@@ -6,6 +6,10 @@
   "scripts": {
     "start": "node ./src/index.js"
   },
+  "allowScripts": {
+    "ffmpeg-static": true,
+    "youtube-dl-exec": true
+  },
   "engines": {
     "node": ">=22.12.0"
   },
