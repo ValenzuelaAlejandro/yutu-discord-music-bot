@@ -1,6 +1,6 @@
-// Helpers for interacting with the bundled yt-dlp binary.
+// Helpers for interacting with the yt-dlp binary (resuelto por core/config).
 const { spawn } = require('child_process');
-const { YTDLP_BIN, COOKIES_FILE, COOKIES_AVAILABLE } = require('../core/config');
+const { getYtDlpBin, COOKIES_FILE, COOKIES_AVAILABLE, PLUGINS_DIR, PLUGINS_DIR_AVAILABLE } = require('../core/config');
 
 // ---------------------------------------------------------------------------
 // Estrategia anti "Sign in to confirm you're not a bot":
@@ -14,21 +14,28 @@ const { YTDLP_BIN, COOKIES_FILE, COOKIES_AVAILABLE } = require('../core/config')
 // ---------------------------------------------------------------------------
 const ENV_PLAYER_CLIENT = (process.env.YTDLP_PLAYER_CLIENT || '').trim();
 
+// Orden basado en las políticas vigentes de YouTube (wiki oficial de yt-dlp):
+//  - android_vr NO requiere PO Token (limitación: vídeos "made for kids").
+//  - tv_simply / tv suelen pasar el bot-check en IPs de datacenter.
+//  - Los clientes web (web_safari, mweb) requieren PO Token para streams
+//    HTTPS/DASH, así que quedan como último recurso.
+// YTDLP_PLAYER_CLIENT también acepta lista separada por comas ("tv,tv_simply").
 const FALLBACK_PLAYER_CLIENTS = [
-  'web_safari',
-  'tv',
   'android_vr',
-  'web_embedded',
+  'tv_simply',
+  'tv',
+  'web_safari',
   'mweb',
-].filter((c) => c !== ENV_PLAYER_CLIENT);
+].filter((c) => !ENV_PLAYER_CLIENT.split(',').map((s) => s.trim()).includes(c));
 
-// Cadena de intentos (con cookies primero; al final, dos intentos sin cookies
-// por si el archivo de cookies está caducado o es la causa del bloqueo).
+// Cadena de intentos (con cookies primero; al final, intentos sin cookies por
+// si el archivo está caducado o son las propias cookies lo que dispara el
+// bot-check).
 const ATTEMPTS = (() => {
   const list = [{ client: null, cookies: COOKIES_AVAILABLE }];
   for (const c of FALLBACK_PLAYER_CLIENTS) list.push({ client: c, cookies: true });
   if (COOKIES_AVAILABLE) {
-    list.push({ client: 'web_safari', cookies: false });
+    list.push({ client: 'android_vr', cookies: false });
     list.push({ client: 'tv', cookies: false });
   }
   return list;
@@ -45,6 +52,9 @@ function withOptions(baseArgs, attempt = {}) {
   let args = [...baseArgs];
   if (cookies && COOKIES_AVAILABLE) args.push('--cookies', COOKIES_FILE);
   if (process.env.YTDLP_PROXY) args.push('--proxy', process.env.YTDLP_PROXY);
+  // Plugins del proyecto (p.ej. proveedor de PO Tokens de YouTube).
+  const pluginDirs = process.env.YTDLP_PLUGIN_DIRS || (PLUGINS_DIR_AVAILABLE ? PLUGINS_DIR : null);
+  if (pluginDirs) args.push('--plugin-dirs', pluginDirs);
   const pc = client || ENV_PLAYER_CLIENT;
   if (pc) args.push('--extractor-args', `youtube:player_client=${pc}`);
   return args;
@@ -53,7 +63,7 @@ function withOptions(baseArgs, attempt = {}) {
 /** Ejecuta yt-dlp y devuelve { code, out, errOut } sin interpretarlos. */
 function runYtDlp(args) {
   return new Promise((resolve) => {
-    const child = spawn(YTDLP_BIN, args);
+    const child = spawn(getYtDlpBin(), args);
     let out = '';
     let errOut = '';
     child.stdout.on('data', (d) => { out += d.toString(); });

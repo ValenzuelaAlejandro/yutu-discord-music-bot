@@ -7,8 +7,36 @@ const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID; // optional, useful for testing
 
-// Path to the bundled yt-dlp binary (yt-dlp.exe on Windows)
-const YTDLP_BIN = constants.YOUTUBE_DL_PATH;
+// ---------------------------------------------------------------------------
+// Resolución del binario de yt-dlp, por prioridad:
+//  1. YTDLP_BIN (variable de entorno; ruta absoluta o relativa al cwd).
+//  2. <raíz>/bin/yt-dlp(.exe) — binario que instalan scripts/update-ytdlp.js y
+//     el auto-update del arranque (YouTube rompe versiones antiguas con
+//     frecuencia, así que poder refrescar sin tocar node_modules es clave).
+//  3. El binario bundled en node_modules/youtube-dl-exec (su postinstall baja
+//     la última versión estable de yt-dlp desde GitHub).
+// Se expone como función para que cada llamada a yt-dlp use el binario vigente
+// aunque el auto-update lo sustituya con el bot ya arrancado.
+// ---------------------------------------------------------------------------
+function getYtDlpBin() {
+  if (process.env.YTDLP_BIN) return path.resolve(process.cwd(), process.env.YTDLP_BIN);
+  const updated = path.join(__dirname, '..', '..', 'bin', process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+  if (fs.existsSync(updated)) return updated;
+  return constants.YOUTUBE_DL_PATH;
+}
+
+const YTDLP_BIN = getYtDlpBin();
+
+// Directorio de plugins de yt-dlp dentro del proyecto (p.ej. un proveedor de
+// PO Tokens); si existe se pasa a yt-dlp vía --plugin-dirs en cada llamada.
+const PLUGINS_DIR = path.join(__dirname, '..', '..', 'yt-dlp-plugins');
+const PLUGINS_DIR_AVAILABLE = (() => {
+  try {
+    return fs.statSync(PLUGINS_DIR).isDirectory();
+  } catch {
+    return false;
+  }
+})();
 
 // ---------------------------------------------------------------------------
 // Cookies de YouTube (formato Netscape) para evitar el bloqueo
@@ -47,10 +75,13 @@ if (!TOKEN) {
 let cookieDetail = '';
 if (COOKIES_AVAILABLE) {
   try {
-    const raw = fs.readFileSync(COOKIES_FILE, 'utf8');
+    const raw = fs.readFileSync(COOKIES_FILE, 'utf8').replace(/^\ufeff/, '');
+    // En formato Netscape las cookies HttpOnly llevan el prefijo "#HttpOnly_":
+    // un conteo ingenuo las trata como comentarios, pero son cookies válidas
+    // (de hecho suelen ser las de sesión: SID, __Secure-3PSID...).
     const cookieLines = raw.split(/\r?\n/).filter((l) => {
       const t = l.trim();
-      return t && !t.startsWith('#') && !t.startsWith('\ufeff#');
+      return t && (!t.startsWith('#') || t.startsWith('#HttpOnly_'));
     });
     const names = cookieLines.map((l) => l.split('\t')[5] || '');
     const hasAuth = names.includes('__Secure-3PSID') || names.includes('SID');
@@ -67,5 +98,23 @@ if (process.env.YTDLP_PLAYER_CLIENT) {
 if (process.env.YTDLP_PROXY) {
   console.log('[cookies] usando proxy (YTDLP_PROXY)');
 }
+if (process.env.YTDLP_BIN) {
+  console.log(`[yt-dlp] binario forzado por YTDLP_BIN: ${YTDLP_BIN}`);
+} else if (YTDLP_BIN !== constants.YOUTUBE_DL_PATH) {
+  console.log(`[yt-dlp] usando binario actualizado: ${YTDLP_BIN}`);
+}
+if (PLUGINS_DIR_AVAILABLE) {
+  console.log(`[yt-dlp] plugins activados: ${PLUGINS_DIR}`);
+}
 
-module.exports = { TOKEN, CLIENT_ID, GUILD_ID, YTDLP_BIN, COOKIES_FILE, COOKIES_AVAILABLE };
+module.exports = {
+  TOKEN,
+  CLIENT_ID,
+  GUILD_ID,
+  YTDLP_BIN,
+  getYtDlpBin,
+  COOKIES_FILE,
+  COOKIES_AVAILABLE,
+  PLUGINS_DIR,
+  PLUGINS_DIR_AVAILABLE,
+};

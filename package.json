@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node ./src/index.js",
-    "yt-test": "node scripts/yt-test.js"
+    "yt-test": "node scripts/yt-test.js",
+    "update-yt-dlp": "node scripts/update-ytdlp.js"
   },
   "allowScripts": {
     "ffmpeg-static": true,

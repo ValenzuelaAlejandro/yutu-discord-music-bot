@@ -11,6 +11,7 @@ const { handleQueue } = require('./commands/queue');
 const { handleAutoplay } = require('./commands/autoplay');
 const { handleNowPlaying } = require('./commands/nowplaying');
 const { setClient } = require('./voice/player');
+const { logYtDlpVersion, scheduleYtDlpAutoUpdate } = require('./media/ytdlpUpdater');
 
 // Prevent a second instance from stealing interactions (Unknown interaction 10062).
 acquireSingleInstanceLock();
@@ -48,6 +49,12 @@ client.once('clientReady', async () => {
   } catch (err) {
     console.error('Error registrando comandos:', err);
   }
+
+  // Diagnóstico y mantenimiento del binario de yt-dlp (ninguno bloquea):
+  // saber la versión exacta es clave para depurar bloqueos de YouTube, y el
+  // auto-update instala la última release en segundo plano si falta.
+  logYtDlpVersion();
+  scheduleYtDlpAutoUpdate();
 });
 
 client.on('interactionCreate', async (interaction) => {

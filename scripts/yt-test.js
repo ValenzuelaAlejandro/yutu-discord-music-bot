@@ -14,7 +14,7 @@ const QUERY = process.argv[2] || 'even flow';
 
 function ytVersion() {
   return new Promise((resolve) => {
-    const child = spawn(config.YTDLP_BIN, ['--version']);
+    const child = spawn(config.getYtDlpBin(), ['--version']);
     let out = '';
     child.stdout.on('data', (d) => { out += d.toString(); });
     child.on('close', () => resolve(out.trim() || '(desconocida)'));
@@ -24,10 +24,11 @@ function ytVersion() {
 
 function describeCookies() {
   if (!config.COOKIES_AVAILABLE) return 'NO disponible (las llamadas van sin --cookies)';
-  const raw = fs.readFileSync(config.COOKIES_FILE, 'utf8');
+  const raw = fs.readFileSync(config.COOKIES_FILE, 'utf8').replace(/^\ufeff/, '');
+  // Igual que en config.js: "#HttpOnly_" es prefijo válido, no comentario.
   const cookieLines = raw.split(/\r?\n/).filter((l) => {
     const t = l.trim();
-    return t && !t.startsWith('#') && !t.startsWith('\ufeff#');
+    return t && (!t.startsWith('#') || t.startsWith('#HttpOnly_'));
   });
   const names = cookieLines.map((l) => l.split('\t')[5] || '');
   const hasAuth = names.includes('__Secure-3PSID') || names.includes('SID');
@@ -54,18 +55,25 @@ async function tryClient(label, client) {
 (async () => {
   console.log('=== yt-test: diagnóstico de extracción de YouTube ===');
   console.log('Consulta :', QUERY);
+  console.log('Binario  :', config.getYtDlpBin());
   console.log('yt-dlp   :', await ytVersion());
   console.log('Cookies  :', describeCookies());
+  if (!config.PLUGINS_DIR_AVAILABLE && !process.env.YTDLP_PLUGIN_DIRS) {
+    console.log('Plugins  : ninguno (para IPs de datacenter muy marcadas, mira el PO Token provider en el README)');
+  } else {
+    console.log('Plugins  :', process.env.YTDLP_PLUGIN_DIRS || config.PLUGINS_DIR);
+  }
   console.log('Intentos (con cookies salvo indicación):');
 
   const attempts = [
     ['default', { client: null, cookies: true }],
-    ['web_safari', { client: 'web_safari', cookies: true }],
-    ['tv', { client: 'tv', cookies: true }],
     ['android_vr', { client: 'android_vr', cookies: true }],
-    ['web_embedded', { client: 'web_embedded', cookies: true }],
+    ['tv_simply', { client: 'tv_simply', cookies: true }],
+    ['tv', { client: 'tv', cookies: true }],
+    ['web_safari', { client: 'web_safari', cookies: true }],
     ['mweb', { client: 'mweb', cookies: true }],
-    ['web_safari SIN cookies', { client: 'web_safari', cookies: false }],
+    ['android_vr SIN cookies', { client: 'android_vr', cookies: false }],
+    ['tv SIN cookies', { client: 'tv', cookies: false }],
   ];
 
   const passed = [];
@@ -80,7 +88,8 @@ async function tryClient(label, client) {
     console.log('Fija el primero en el panel como variable de entorno: YTDLP_PLAYER_CLIENT=<cliente>');
   } else {
     console.log('Ningún cliente pasó el bot-check desde esta IP.');
-    console.log('Opciones: (1) revisa/renueva cookies.txt, (2) usa un proxy residencial con YTDLP_PROXY,');
-    console.log('          (3) ejecuta el bot desde una IP residencial.');
+    console.log('Opciones: (1) renueva cookies.txt exportándolas en ventana de incógnito,');
+    console.log('          (2) instala un proveedor de PO Tokens (bgutil-ytdlp-pot-provider, ver README),');
+    console.log('          (3) usa un proxy residencial con YTDLP_PROXY o cambia a una IP residencial.');
   }
 })();

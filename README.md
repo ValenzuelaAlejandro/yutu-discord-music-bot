@@ -21,14 +21,21 @@ YTDLP_COOKIES=ruta/a/cookies.txt   # opcional, ver nota de cookies abajo
 
 ### Cookies de YouTube
 
-YouTube con frecuencia bloquea la extracción sin autenticación con
-"Sign in to confirm you're not a bot". Si `/play` falla con ese error, exporta
-tus cookies de YouTube en formato Netscape y deja el archivo en la raíz del
-proyecto como `cookies.txt` (o apúntalo con `YTDLP_COOKIES` en `.env`):
+YouTube bloquea a menudo la extracción anónima con "Sign in to confirm
+you're not a bot". Si `/play` falla con ese error, exporta tus cookies de
+YouTube en formato Netscape y deja el archivo en la raíz del proyecto como
+`cookies.txt` (o apúntalo con `YTDLP_COOKIES` en `.env`).
 
-```bash
-yt-dlp --cookies-from-browser chrome --cookies cookies.txt
-```
+**Cómo exportarlas correctamente** (recomendación oficial de yt-dlp): no uses
+`--cookies-from-browser`, porque YouTube rota esas cookies al abrir YouTube en
+el navegador normal y dejan de servir a los pocos días. En su lugar:
+
+1. Abre una **ventana de incógnito** e inicia sesión en YouTube.
+2. En esa misma pestaña entra en `https://www.youtube.com/robots.txt`.
+3. Con una extensión tipo "Get cookies.txt LOCALLY" exporta solo las cookies
+   de `youtube.com` desde esa pestaña.
+4. Cierra la ventana de incógnito sin abrir YouTube de nuevo: así la sesión no
+   se rota y dura mucho más.
 
 El bot detecta el archivo automáticamente y añade `--cookies cookies.txt` a
 todas las llamadas de yt-dlp. Al arrancar imprime el estado:
@@ -45,31 +52,60 @@ YTDLP_COOKIES_CONTENT=# Netscape HTTP Cookie File\nyoutube.com... etc
 `cookies.txt` contiene credenciales sensibles y está excluido de git
 (`.gitignore`). Las cookies caducan; re-expórtalas periódicamente.
 
-### Bloqueo "Sign in to confirm you're not a bot" (IP de datacenter)
+### Bloqueo "Sign in to confirm you're not a bot"
 
-Si el bot funciona localmente pero en el hosting falla con ese error aun con
-cookies, la IP del datacenter está bloqueada por YouTube y yt-dlp necesita un
-"player client" alternativo. El bot ya reintenta automáticamente con varios
-clientes al detectar el bloqueo, pero puedes diagnosticar exactamente cuál
-funciona desde la consola del hosting:
+Causas típicas, ordenadas por probabilidad:
+
+1. **Versión antigua de yt-dlp**: YouTube rompe clientes en cada cambio de API.
+   El bot registra la versión en el arranque (`[yt-dlp] versión del binario:`)
+   y se auto-actualiza en segundo plano a la última estable (apagable con
+   `YTDLP_AUTO_UPDATE=0`). También puedes forzarla a mano con
+   `npm run update-yt-dlp`. Si tu hosting no puede descargar de GitHub, fija un
+   binario propio con `YTDLP_BIN=/ruta/yt-dlp`.
+2. **IP de datacenter marcada por YouTube** (hosting tipo Pterodactyl/VPS): aun
+   con cookies válidas, todos los clientes pueden recibir ese mensaje. Es el
+   caso más difícil y tiene estas soluciones, de mayor a menor eficacia:
+   - **PO Token Provider** (solución recomendada por yt-dlp): instala el plugin
+     [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider)
+     dejando su carpeta de plugin en `yt-dlp-plugins/` dentro de la raíz del
+     proyecto (o apunta `YTDLP_PLUGIN_DIRS` a otra ruta). El bot añade
+     automáticamente `--plugin-dirs` a cada llamada de yt-dlp. Sigue las
+     instrucciones de su README para levantar el generador de tokens (servidor
+     HTTP en Node/Docker o modo script); sin él, el plugin no puede emitir tokens.
+   - **Proxy residencial**: `YTDLP_PROXY=http://user:pass@host:port` en el panel
+     o `.env`. Enruta solo yt-dlp, no el resto del bot.
+   - **Renovar cookies** con el método de incógnito de arriba; unas cookies
+     caducadas pueden *provocar* el bot-check en vez de evitarlo (la cadena de
+     reintento también prueba los últimos intentos sin cookies por esto).
+3. **Límite de peticiones**: YouTube permite ~300 vídeos/hora como anónimo y
+   ~2000/hora con cuenta. Un uso intensivo (playlists grandes, autoplay) puede
+   disparar comprobaciones temporales.
+
+Diagnóstico desde la consola del hosting — prueba la cadena de clientes que usa
+el bot y dice cuál pasa el bloqueo desde esa IP:
 
 ```bash
 npm run yt-test
 ```
 
-Según el resultado, fija el cliente que pase como variable de entorno:
+Si algún cliente individual funciona, fíjalo para saltarte los anteriores:
 
 ```
-YTDLP_PLAYER_CLIENT=web_safari
+# uno concreto...
+YTDLP_PLAYER_CLIENT=android_vr
+# ...o varios, separados por comas (se probarán en ese orden)
+YTDLP_PLAYER_CLIENT=tv_simply,tv,android_vr
 ```
 
-Opciones adicionales via `.env` / variables del panel:
+Variables de entorno relacionadas (`.env` o panel):
 
-- `YTDLP_PLAYER_CLIENT=<cliente>` — fuerza un player client (p.ej. `web_safari`,
-  `tv`, `android_vr`, `web_embedded`, `mweb`).
-- `YTDLP_PROXY=http://user:pass@host:port` — enruta yt-dlp por un proxy
-  (http/https/socks5). Un proxy residencial suele resolver el bloqueo.
+- `YTDLP_PLAYER_CLIENT=<cliente[,cliente2]>` — fuerza el/los player clients.
+- `YTDLP_PROXY=<url>` — proxy http/https/socks5 solo para yt-dlp.
 - `YTDLP_COOKIES`, `YTDLP_COOKIES_CONTENT` — ver sección de cookies.
+- `YTDLP_BIN=<ruta>` — usa un binario de yt-dlp externo (desactiva auto-update).
+- `YTDLP_AUTO_UPDATE=0` — desactiva el auto-update del arranque.
+- `YTDLP_PLUGIN_DIRS=<ruta>` — directorio(s) de plugins; por defecto se usa
+  `yt-dlp-plugins/` de la raíz si existe.
 
 3. Ejecuta el bot:
 
@@ -107,6 +143,7 @@ src/
     embeds.js        # Constructores de embeds reutilizables (miniatura, cola, avisos, etc.)
   media/             # Extracción y procesamiento multimedia
     ytdlp.js         # Helpers para yt-dlp (URL directa, JSON, resolver pistas, playlists)
+    ytdlpUpdater.js  # Auto-update del binario de yt-dlp (arranque y npm run update-yt-dlp)
     ffmpeg.js        # Helper para transcode de audio con ffmpeg-static
   voice/             # Motor de reproducción de audio
     player.js        # Reproductor (cola, conexión de voz, autoplay "radio similar")
