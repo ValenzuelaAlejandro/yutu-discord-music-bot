@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node ./src/index.js",
     "yt-test": "node scripts/yt-test.js",
-    "update-yt-dlp": "node scripts/update-ytdlp.js"
+    "update-yt-dlp": "node scripts/update-ytdlp.js",
+    "setup-pot-provider": "node scripts/setup-pot-provider.js"
   },
   "allowScripts": {
     "ffmpeg-static": true,

@@ -67,11 +67,33 @@ Causas típicas, ordenadas por probabilidad:
    caso más difícil y tiene estas soluciones, de mayor a menor eficacia:
    - **PO Token Provider** (solución recomendada por yt-dlp): instala el plugin
      [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider)
-     dejando su carpeta de plugin en `yt-dlp-plugins/` dentro de la raíz del
-     proyecto (o apunta `YTDLP_PLUGIN_DIRS` a otra ruta). El bot añade
-     automáticamente `--plugin-dirs` a cada llamada de yt-dlp. Sigue las
-     instrucciones de su README para levantar el generador de tokens (servidor
-     HTTP en Node/Docker o modo script); sin él, el plugin no puede emitir tokens.
+     con un solo comando:
+
+     ```bash
+     npm run setup-pot-provider
+     ```
+
+     Deja el plugin en `yt-dlp-plugins/` (el bot añade automáticamente
+     `--plugin-dirs` a cada llamada de yt-dlp) e instala el generador de tokens
+     en modo script en `~/bgutil-ytdlp-pot-provider` (sin Docker ni procesos
+     extra; requiere Node >= 20 y acceso a registry.npmjs.org). Después
+     **reinicia el bot** y prueba con `npm run yt-test`. Si en los logs de
+     yt-dlp ves `timed out after 15.0 seconds` (el límite de 15 s del modo
+     script es fijo y no configurable en yt-dlp), levanta en su lugar el
+     generador HTTP persistente y reinicia:
+
+     ```bash
+     docker run -d --name bgutil-provider --init \
+       -p 4416:4416 brainicism/bgutil-ytdlp-pot-provider
+     npm run setup-pot-provider   # el plugin ya está; esto solo asegura que el generador viva
+     ```
+
+     El plugin prioriza el servidor HTTP sobre el script cuando responde en su
+     puerto por defecto. Como alternativa manual, sigue las instrucciones del
+     README del plugin (servidor HTTP en Node/Docker o modo script); sin
+     generador, el plugin no puede emitir tokens. Variable de entorno:
+     `BGUTIL_TAG=<versión>` fija la versión y `BGUTIL_HOME=<ruta>` cambia dónde
+     se instala el generador.
    - **Proxy residencial**: `YTDLP_PROXY=http://user:pass@host:port` en el panel
      o `.env`. Enruta solo yt-dlp, no el resto del bot.
    - **Renovar cookies** con el método de incógnito de arriba; unas cookies

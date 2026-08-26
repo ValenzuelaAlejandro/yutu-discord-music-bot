@@ -4,3 +4,5 @@ logs/
 cookies.txt
 bin/
 *.log
+yt-dlp-plugins/
+

@@ -72,26 +72,52 @@ if (!TOKEN) {
 }
 
 // Detalle útil para diagnosticar el bloqueo "not a bot" desde el arranque.
-let cookieDetail = '';
-if (COOKIES_AVAILABLE) {
+// En formato Netscape las cookies HttpOnly llevan el prefijo "#HttpOnly_":
+// un conteo ingenuo las trata como comentarios, pero son cookies válidas
+// (de hecho suelen ser las de sesión: SID, __Secure-3PSID...).
+const COOKIE_GROUPS = [
+  { label: 'SID (sesión)', names: ['SID', '__Secure-1PSID', '__Secure-3PSID'] },
+  { label: 'HSID', names: ['HSID'] },
+  { label: 'SSID', names: ['SSID'] },
+  { label: 'SAPISID (autorización API)', names: ['SAPISID', '__Secure-1PAPISID', '__Secure-3PAPISID'] },
+  { label: 'LOGIN_INFO', names: ['LOGIN_INFO'] },
+];
+
+/** Diagnóstico legible del archivo de cookies ('' si no hay archivo o no se lee). */
+function summarizeCookieFile() {
+  if (!COOKIES_AVAILABLE) return '';
   try {
     const raw = fs.readFileSync(COOKIES_FILE, 'utf8').replace(/^\ufeff/, '');
-    // En formato Netscape las cookies HttpOnly llevan el prefijo "#HttpOnly_":
-    // un conteo ingenuo las trata como comentarios, pero son cookies válidas
-    // (de hecho suelen ser las de sesión: SID, __Secure-3PSID...).
     const cookieLines = raw.split(/\r?\n/).filter((l) => {
       const t = l.trim();
       return t && (!t.startsWith('#') || t.startsWith('#HttpOnly_'));
     });
-    const names = cookieLines.map((l) => l.split('\t')[5] || '');
-    const hasAuth = names.includes('__Secure-3PSID') || names.includes('SID');
-    cookieDetail = ` (${raw.length} bytes, ${cookieLines.length} cookies, cuenta autenticada: ${hasAuth ? 'sí' : 'NO'})`;
-  } catch { /* si no se puede leer, no importa */ }
+    const names = new Set(cookieLines.map((l) => l.split('\t')[5] || ''));
+    const hasAuth = names.has('__Secure-3PSID') || names.has('SID');
+    let detail = ` (${raw.length} bytes, ${cookieLines.length} cookies, cuenta autenticada: ${hasAuth ? 'sí' : 'NO'})`;
+    // Una exportación que omite cookies clave (p.ej. solo __Secure-3P*) no
+    // basta para pasar el bot-check aunque figure como "autenticada".
+    const missing = COOKIE_GROUPS
+      .filter((g) => !g.names.some((n) => names.has(n)))
+      .map((g) => g.label);
+    if (missing.length) {
+      detail += '\n[cookies] AVISO: faltan cookies importantes (' + missing.join(', ') + ').'
+        + ' La exportación parece incompleta: re-expórtalas con el método del README'
+        + ' (incógnito -> youtube.com/robots.txt -> extensión "Get cookies.txt LOCALLY").';
+    }
+    return detail;
+  } catch {
+    return ''; /* si no se puede leer, no importa */
+  }
 }
 
-console.log(
-  `[cookies] archivo: ${COOKIES_FILE} (${COOKIES_AVAILABLE ? 'disponible' : 'NO disponible — YouTube puede bloquear la extracción'}${cookieDetail})`
-);
+const cookieDetail = COOKIES_AVAILABLE ? summarizeCookieFile() : '';
+
+if (COOKIES_AVAILABLE) {
+  console.log(`[cookies] archivo: ${COOKIES_FILE} — disponible${cookieDetail}`);
+} else {
+  console.log('[cookies] archivo: ' + COOKIES_FILE + ' — NO disponible (YouTube puede bloquear la extracción)');
+}
 if (process.env.YTDLP_PLAYER_CLIENT) {
   console.log(`[cookies] YTDLP_PLAYER_CLIENT=${process.env.YTDLP_PLAYER_CLIENT}`);
 }
@@ -115,6 +141,7 @@ module.exports = {
   getYtDlpBin,
   COOKIES_FILE,
   COOKIES_AVAILABLE,
+  summarizeCookieFile,
   PLUGINS_DIR,
   PLUGINS_DIR_AVAILABLE,
 };

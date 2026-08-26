@@ -78,6 +78,20 @@ function attemptLabel(attempt) {
   return attempt.cookies === false ? `${client} (sin cookies)` : client;
 }
 
+// Aviso único cuando se agota toda la cadena de clientes por bot-check y no hay
+// plugins: orienta al operador hacia la instalación del proveedor de PO Tokens.
+let potHintShown = false;
+function hintPotProviderOnError(errorText) {
+  if (potHintShown) return;
+  if (!RETRYABLE_ERROR_RE.test(errorText || '')) return;
+  if (PLUGINS_DIR_AVAILABLE || process.env.YTDLP_PLUGIN_DIRS) return;
+  potHintShown = true;
+  console.warn(
+    '[yt-dlp] Bloqueo persistente tras probar todos los clientes. En IPs de datacenter (hosting/VPS) la salida\n'
+    + '[yt-dlp] habitual es un proveedor de PO Tokens: instálalo con  npm run setup-pot-provider  y reinicia el bot.'
+  );
+}
+
 // ---------------------------------------------------------------
 // Caché en memoria de URLs de audio directas.
 // El paso más caro es la extracción de yt-dlp (carga de la página de
@@ -133,6 +147,7 @@ async function getDirectAudioUrl(target) {
     console.warn(`[yt-dlp] fallo recuperable (${attemptLabel(attempt)}); reintentando con otro cliente`);
   }
   if (!lastErr) lastErr = 'sin salida de yt-dlp';
+  hintPotProviderOnError(lastErr);
   console.warn(`[yt-dlp] no URL produced:\n${lastErr.slice(0, 500)}`);
   return null;
 }
@@ -169,6 +184,7 @@ async function ytDlpJsonSmart(args) {
       console.warn(`[yt-dlp] fallo recuperable (${attemptLabel(attempt)}); reintentando con otro cliente`);
     }
   }
+  hintPotProviderOnError(lastErr?.message || String(lastErr));
   throw lastErr;
 }
 

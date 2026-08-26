@@ -6,7 +6,6 @@
  * Uso:  node scripts/yt-test.js ["consulta"]
  */
 const { spawn } = require('child_process');
-const fs = require('fs');
 const config = require('../src/core/config');
 const { ytDlpJson } = require('../src/media/ytdlp');
 
@@ -24,15 +23,8 @@ function ytVersion() {
 
 function describeCookies() {
   if (!config.COOKIES_AVAILABLE) return 'NO disponible (las llamadas van sin --cookies)';
-  const raw = fs.readFileSync(config.COOKIES_FILE, 'utf8').replace(/^\ufeff/, '');
-  // Igual que en config.js: "#HttpOnly_" es prefijo válido, no comentario.
-  const cookieLines = raw.split(/\r?\n/).filter((l) => {
-    const t = l.trim();
-    return t && (!t.startsWith('#') || t.startsWith('#HttpOnly_'));
-  });
-  const names = cookieLines.map((l) => l.split('\t')[5] || '');
-  const hasAuth = names.includes('__Secure-3PSID') || names.includes('SID');
-  return `${config.COOKIES_FILE} (${raw.length} bytes, ${cookieLines.length} cookies, cuenta autenticada: ${hasAuth ? 'sí' : 'NO'})`;
+  // Misma información que imprime el arranque (incluye aviso si faltan cookies clave).
+  return `${config.COOKIES_FILE} ${config.summarizeCookieFile().replace(/\n/g, '\n  ')}`;
 }
 
 async function tryClient(label, client) {
