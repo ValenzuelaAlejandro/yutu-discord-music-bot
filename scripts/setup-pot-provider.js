@@ -122,6 +122,38 @@ function npmCmd(name) {
   return process.platform === 'win32' ? `${name}.cmd` : name;
 }
 
+/** Copia recursiva de directorio (fallback cuando rename cruza filesystems). */
+function copyDir(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const s = path.join(src, entry.name);
+    const d = path.join(dest, entry.name);
+    if (entry.isDirectory()) copyDir(s, d);
+    else fs.copyFileSync(s, d);
+  }
+}
+
+/**
+ * Mueve el directorio extraído a `home`. En contenedores (Docker/Pterodactyl)
+ * /tmp suele estar en otro filesystem que el home, y rename a través de
+ * dispositivos falla con EXDEV; por eso se intenta rename primero y, si cruza
+ * filesystem, se hace una copia recursiva en su lugar.
+ */
+function moveExtractedToHome(extractedPath, home) {
+  try {
+    if (fs.existsSync(home)) fs.rmSync(home, { recursive: true, force: true });
+    fs.renameSync(extractedPath, home);
+  } catch (err) {
+    if (err && err.code === 'EXDEV') {
+      console.log('[pot] filesystems distintos; copiando en vez de mover...');
+      if (!fs.existsSync(home)) fs.mkdirSync(path.dirname(home), { recursive: true });
+      copyDir(extractedPath, home);
+    } else {
+      throw err;
+    }
+  }
+}
+
 async function installProvider(tag) {
   const home = providerHome();
   const marker = path.join(home, '.yutu-setup-version');
@@ -143,22 +175,25 @@ async function installProvider(tag) {
   } catch { /* versión desconocida: se reinstala */ }
 
   if (!reuseSource) {
-    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bgutil-'));
+    // Extraemos en el MISMO filesystem que `home` (youtube-dl: /tmp en Docker
+    // suele ser otro dispositivo) y después movemos/copiamos a `home`.
+    const parentHome = path.dirname(home);
+    fs.mkdirSync(parentHome, { recursive: true });
+    const stagingDir = fs.mkdtempSync(path.join(parentHome, '.bgutil-staging-'));
     try {
       console.log(`[pot] descargando fuente del generador (${tag})...`);
-      const tgz = path.join(tmpRoot, 'src.tar.gz');
+      const tgz = path.join(stagingDir, 'src.tar.gz');
       await downloadTo(TARBALL_URL(tag), tgz);
 
       console.log('[pot] extrayendo...');
-      const { code, out } = await run('tar', ['-xzf', tgz, '-C', tmpRoot]);
+      const { code, out } = await run('tar', ['-xzf', tgz, '-C', stagingDir]);
       if (code !== 0) throw new Error(`tar no pudo extraer el tarball (${out.trim().slice(0, 200)}). ¿Está 'tar' en el PATH?`);
-      const extractedDir = fs.readdirSync(tmpRoot)
+      const extractedDir = fs.readdirSync(stagingDir)
         .find((n) => n.startsWith('bgutil-ytdlp-pot-provider'));
       if (!extractedDir) throw new Error('contenido inesperado del tarball');
-      if (fs.existsSync(home)) fs.rmSync(home, { recursive: true, force: true });
-      fs.renameSync(path.join(tmpRoot, extractedDir), home);
+      moveExtractedToHome(path.join(stagingDir, extractedDir), home);
     } finally {
-      try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch { /* best-effort */ }
+      try { fs.rmSync(stagingDir, { recursive: true, force: true }); } catch { /* best-effort */ }
     }
   } else {
     console.log(`[pot] fuente ya presente en ${home} (versión ${tag}); reutilizando`);
