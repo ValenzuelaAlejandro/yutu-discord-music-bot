@@ -94,6 +94,12 @@ Causas típicas, ordenadas por probabilidad:
      generador, el plugin no puede emitir tokens. Variable de entorno:
      `BGUTIL_TAG=<versión>` fija la versión y `BGUTIL_HOME=<ruta>` cambia dónde
      se instala el generador.
+
+     El bot levanta y supervisa el servidor del proveedor automáticamente al
+     arrancar (`[pot-provider] servidor de PO Tokens en marcha` en el log): no
+     hace falta tocarlo en el comando de arranque del hosting aunque sea volátil.
+     Si el servidor cae, el bot lo relanza él solo. Apagable con
+     `YTDLP_POT_PROVIDER=0` (p.ej. si prefieres gestionarlo con Docker).
    - **Proxy residencial**: `YTDLP_PROXY=http://user:pass@host:port` en el panel
      o `.env`. Enruta solo yt-dlp, no el resto del bot.
    - **Renovar cookies** con el método de incógnito de arriba; unas cookies

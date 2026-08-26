@@ -12,9 +12,15 @@ const { handleAutoplay } = require('./commands/autoplay');
 const { handleNowPlaying } = require('./commands/nowplaying');
 const { setClient } = require('./voice/player');
 const { logYtDlpVersion, scheduleYtDlpAutoUpdate } = require('./media/ytdlpUpdater');
+const { startPotProvider } = require('./media/potProvider');
 
 // Prevent a second instance from stealing interactions (Unknown interaction 10062).
 acquireSingleInstanceLock();
+
+// Levanta y vigila el proveedor de PO Tokens (bgutil). Vive dentro del proceso
+// del bot para no depender de un startup volátil en el hosting: si el servidor
+// HTTP cae, este supervisor lo relanza en segundos.
+startPotProvider();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 // Inyecta el cliente en el subsistema de audio para enviar el embed "now playing".
